@@ -269,15 +269,69 @@ void *alloc_mem( unsigned int amount ){
   /* your code here */
 	if(amount == 0)	return NULL;
 
+	struct free_block *mem_ptr = NULL;
+	struct free_block *ptr;
+	struct tag_block *tag_ptr, *tag_ptr_f, *tag_ptr_a, *end_ptr;
 	int req_amt = (amount % 16 == 0) ? amount : ((amount / 16) + 1) * 16;
 
-	struct tag_block *tag = ((struct tag_block *) (free_list->fwd_link)) - 1;
-	
-	printf("Found %d available (%d next)\n", free_size(), tag->size);	
+	if(free_size() - req_amt < 48) {
+		//TODO
+	} else {
+		// Step through the free list
+		ptr = free_list -> fwd_link;
+		tag_ptr = ((struct tag_block *) (ptr)) - 1;
 
-	printf(tag->sig);
+		while(ptr != NULL && ptr != free_list && mem_ptr == NULL) {
+			// Select first available node
+			if(tag_ptr->size >= req_amt) {
+				mem_ptr = ptr;
+			} else {
+				ptr = ptr -> fwd_link;
+				tag_ptr = ((struct tag_block *) ptr) - 1;
+			}
+		}
 
-	return NULL;
+		// TODO better error handling
+		if(ptr == NULL || ptr == free_list) return NULL;
+
+		// Remove node from list
+		if(tag_ptr->size == req_amt) {
+			tag_ptr->tag=1;
+			end_ptr = tag_ptr + tag_ptr->size + 1;
+			end_ptr->tag = 1;
+
+			struct free_block *prev = ptr->back_link;
+			prev->fwd_link = ptr->fwd_link;
+			ptr->fwd_link->back_link = prev;
+		} else {
+			// Top tag block will be assigned to new, smaller mem block
+			tag_ptr->tag = 0;
+			// Bottom tag block will be assigned to allocated memblock
+			end_ptr = tag_ptr + tag_ptr->size + 1;
+			end_ptr->tag = 1;
+			
+			// Add tag at bottom of free block
+			tag_ptr->size = tag_ptr->size - req_amt;
+			tag_ptr_f = tag_ptr + tag_ptr->size + 1;
+			tag_ptr_f->tag = 0;
+			strcpy(tag_ptr_f->sig, tag_ptr->sig);
+			tag_ptr_f->size = tag_ptr->size;
+
+			// Create new tag block for allocated memblk
+			end_ptr->size = req_amt;
+
+			tag_ptr_a = end_ptr - req_amt - 1;
+			tag_ptr_a->tag = 1;
+			// FIXME: reassign signature?
+			strcpy(tag_ptr_a->sig, end_ptr->sig);
+			tag_ptr_a->size = end_ptr->size;
+			
+			// Assign memory pointer to pass out
+			mem_ptr = (struct free_block *) (end_ptr - req_amt);
+		}
+	}
+
+	return mem_ptr;
 }
 
 
