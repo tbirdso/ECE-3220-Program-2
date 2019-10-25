@@ -281,6 +281,8 @@ void *alloc_mem( unsigned int amount ){
 }
 
 
+/* Step through the free list and count block sizes
+ */
 int free_size() {
 	// if list is full return 0
 	if (free_list == NULL) return 0;
@@ -288,12 +290,14 @@ int free_size() {
 
 	// otherwise step through list to calculate size
 	struct free_block *ptr = free_list -> fwd_link;
-	int size = *(int *)(ptr - 4);
+	struct tag_block *tag_ptr = ((struct tag_block *) (ptr)) - 1;
+	int size = tag_ptr->size;
 	ptr = ptr -> fwd_link;
 
 	
 	while(!(ptr == NULL) && !(ptr == free_list)) {
-		size += *(int *)(ptr - 4);
+		tag_ptr = ((struct tag_block *) (ptr)) - 1;
+		size += tag_ptr->size;
 		ptr = ptr -> fwd_link;
 	}
 
