@@ -4,6 +4,9 @@ program: alloc.c
 debug: alloc.c
 	gcc -Wall -g -o alloc.out alloc.c
 
+gdb: alloc.out
+	gdb ./alloc.out
+
 run: alloc.out
 	./alloc.out
 
