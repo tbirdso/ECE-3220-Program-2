@@ -267,7 +267,6 @@ void prt_free_list(){
 void *alloc_mem( unsigned int amount ){
 
   /* your code here */
-	printf("Looking for block of free size %d\n", amount);
 	if(amount == 0)	return NULL;
 
 	struct free_block *mem_ptr = NULL;
@@ -297,12 +296,12 @@ void *alloc_mem( unsigned int amount ){
 		// Top tag block will be assigned to new, smaller mem block
 		tag_ptr->tag = 0;
 		// Bottom tag block will be assigned to allocated memblock
-		end_ptr = tag_ptr + tag_ptr->size + 1; //FIXME
+		end_ptr = tag_ptr + (tag_ptr->size / 16) + 1;
 		end_ptr->tag = 1;
 		
 		// Add tag at bottom of free block
-		tag_ptr->size = tag_ptr->size - req_amt;
-		tag_ptr_f = tag_ptr + tag_ptr->size + 1;
+		tag_ptr->size = tag_ptr->size - req_amt - 2 * sizeof(struct tag_block);
+		tag_ptr_f = tag_ptr + (tag_ptr->size / 16) + 1;
 		tag_ptr_f->tag = 0;
 		strcpy(tag_ptr_f->sig, tag_ptr->sig);
 		tag_ptr_f->size = tag_ptr->size;
@@ -310,7 +309,7 @@ void *alloc_mem( unsigned int amount ){
 		// Create new tag block for allocated memblk
 		end_ptr->size = req_amt;
 
-		tag_ptr_a = end_ptr - req_amt - 1;
+		tag_ptr_a = end_ptr - (req_amt / 16) - 1;
 		tag_ptr_a->tag = 1;
 		// FIXME: reassign signature?
 		strcpy(tag_ptr_a->sig, end_ptr->sig);
@@ -318,17 +317,13 @@ void *alloc_mem( unsigned int amount ){
 			
 		// Don't need to edit links because free block location did not change
 		// Assign memory pointer to pass out
-		mem_ptr = (struct free_block *) (end_ptr - req_amt);
-
-
-		printf("end_ptr is at %x with tag %d and size %d\n", end_ptr, end_ptr->tag, end_ptr->size);
+		mem_ptr = (struct free_block *) (end_ptr - (req_amt / 16));
 
 	// If block is approximately the same size as the request, allocate it
 	} else {
 
 		tag_ptr->tag=1;
 		end_ptr = tag_ptr + (tag_ptr->size / 16) + 1;
-		printf("Found end_ptr at %x with tag %d and size %d\n", end_ptr, end_ptr->tag, end_ptr->size);
 		end_ptr->size = tag_ptr->size;
 		end_ptr->tag = 1;
 
@@ -445,25 +440,21 @@ int free_size() {
 unsigned int release_mem( void *ptr ){
 
 	// Check for bad pointer
-	if(ptr == NULL) return 0;
+	if(ptr == NULL) return 1;
 
 	int coalesce_lower = 0, coalesce_upper = 0;
 	struct free_block *f_ptr = (struct free_block *)ptr;
 	struct tag_block *tag_ptr = (struct tag_block *)ptr - 1;
 	struct tag_block *end_ptr = tag_ptr + 1 + (tag_ptr->size / 16);
 
-	printf("pointer is %x and tag is %d and size is %x\n", end_ptr, end_ptr->tag, end_ptr->size);
-
-	if((void *)tag_ptr == (void *)free_list) return 0;
-	if(tag_ptr->tag != 1 || end_ptr->tag != 1) return 0; 
-	if(tag_ptr->size == 0 || end_ptr->size == 0) return 0;
+	if((void *)tag_ptr == (void *)free_list) return 1;
+	if(tag_ptr->tag != 1 || end_ptr->tag != 1) return 1; 
+	if(tag_ptr->size == 0 || end_ptr->size == 0) return 1;
 
 	// Check upper and lower blocks
 	coalesce_lower = (end_ptr + 1)->tag == 0 ? 1 : 0;
 	coalesce_upper = (tag_ptr - 1)->tag == 0 ? 1 :  0;
 
-	printf("made it to cases with lower %d and upper %d", coalesce_lower, coalesce_upper);
-	
 	// Case 1: No coalesce
 	if(!coalesce_lower && !coalesce_upper) {
 		// Reset tag block status
@@ -501,7 +492,7 @@ unsigned int release_mem( void *ptr ){
 		tag_ptr->tag = 0;
 
 		bottom_tag->size += tag_ptr->size + 2 * sizeof(struct tag_block);
-		end_ptr->size = bottom_tag->size;
+		tag_ptr->size = bottom_tag->size;
 
 		f_ptr->fwd_link = bottom_block->fwd_link;
 		f_ptr->fwd_link->back_link = f_ptr;
@@ -526,7 +517,7 @@ unsigned int release_mem( void *ptr ){
 
 	}
 	// Return status integer
-	return 1;
+	return 0;
 }
 
 
