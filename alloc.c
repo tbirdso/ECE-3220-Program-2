@@ -311,9 +311,15 @@ void *alloc_mem( unsigned int amount ){
 
 		tag_ptr_a = end_ptr - (req_amt / 16) - 1;
 		tag_ptr_a->tag = 1;
-		// FIXME: reassign signature?
-		strcpy(tag_ptr_a->sig, end_ptr->sig);
+		tag_ptr_a->size = end_ptr->size;		
+
 		tag_ptr_a->size = end_ptr->size;
+		// FIXME: reassign signature?
+		strcpy(tag_ptr->sig, "top_memblk");
+		strcpy(tag_ptr_f->sig, "end_memblk");
+
+		strcpy(tag_ptr_a->sig, "top_alcblk");
+		strcpy(end_ptr->sig, "end_alcblk");
 			
 		// Don't need to edit links because free block location did not change
 		// Assign memory pointer to pass out
@@ -330,6 +336,9 @@ void *alloc_mem( unsigned int amount ){
 		struct free_block *prev = ptr->back_link;
 		prev->fwd_link = ptr->fwd_link;
 		ptr->fwd_link->back_link = prev;
+
+		strcpy(tag_ptr->sig, "top_alcblk");
+		strcpy(end_ptr->sig, "end_alcblk");
 	}
  
 	return mem_ptr;
@@ -468,6 +477,9 @@ unsigned int release_mem( void *ptr ){
 		f_ptr->fwd_link = temp_ptr;
 		f_ptr->fwd_link->back_link = f_ptr;
 
+		strcpy(tag_ptr->sig, "top_memblk");
+		strcpy(end_ptr->sig, "end_memblk");
+
 	}
 	// Case 2: Coalesce with upper
 	else if(!coalesce_lower && coalesce_upper) {
@@ -480,6 +492,9 @@ unsigned int release_mem( void *ptr ){
 
 		top_tag->size += tag_ptr->size + 2 * sizeof(struct tag_block);
 		end_ptr->size = top_tag->size;
+
+		strcpy(top_tag->sig, "top_memblk");
+		strcpy(end_ptr->sig, "end_memblk");
 
 	}
 	// Case 3: Coalesce with lower
@@ -500,6 +515,9 @@ unsigned int release_mem( void *ptr ){
 		f_ptr->back_link = bottom_block->back_link;
 		f_ptr->back_link->fwd_link = f_ptr;
 
+		strcpy(tag_ptr->sig, "top_memblk");
+		strcpy(bottom_tag->sig, "end_memblk");
+
 	}
 	// Case 4: Coalesce with upper and lower
 	else {
@@ -516,6 +534,9 @@ unsigned int release_mem( void *ptr ){
 
 		top_block->fwd_link = bottom_block->fwd_link;
 		top_block->fwd_link->back_link = top_block;
+
+		strcpy(top_tag->sig, "top_memblk");
+		strcpy(bottom_tag->sig, "end_memblk");
 
 	}
 	// Return status integer
