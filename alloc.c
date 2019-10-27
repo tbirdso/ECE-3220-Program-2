@@ -1,4 +1,11 @@
 /* CPSC/ECE 3220-002 - Fall 2019 - program 2 skeleton
+ * Name:	Tom Birdsong
+ * Date:	10/27/2019
+ * Original file:	alloc_skeleton.c
+ * Purpose: Develop coalescing routines for OS memory management
+ */
+
+/*
  *
  * This program maintains a free list of memory allocation blocks
  * for dynamic allocation.
@@ -266,7 +273,7 @@ void prt_free_list(){
 
 void *alloc_mem( unsigned int amount ){
 
-  /* your code here */
+	// Identify conditions where request cannot be completed
 	if(amount == 0)	return NULL;
 
 	struct free_block *mem_ptr = NULL;
@@ -274,7 +281,7 @@ void *alloc_mem( unsigned int amount ){
 	struct tag_block *tag_ptr, *tag_ptr_f, *tag_ptr_a, *end_ptr;
 	int req_amt = (amount % 16 == 0) ? amount : ((amount / 16) + 1) * 16;
 
-	// Step through the free list
+	// Step through the free list and get the first-fit block
 	ptr = free_list -> fwd_link;
 	tag_ptr = ((struct tag_block *) (ptr)) - 1;
 
@@ -313,8 +320,7 @@ void *alloc_mem( unsigned int amount ){
 		tag_ptr_a->tag = 1;
 		tag_ptr_a->size = end_ptr->size;		
 
-		tag_ptr_a->size = end_ptr->size;
-		// FIXME: reassign signature?
+		// Assign signatures
 		strcpy(tag_ptr->sig, "top_memblk");
 		strcpy(tag_ptr_f->sig, "end_memblk");
 
@@ -325,18 +331,21 @@ void *alloc_mem( unsigned int amount ){
 		// Assign memory pointer to pass out
 		mem_ptr = (struct free_block *) (end_ptr - (req_amt / 16));
 
-	// If block is approximately the same size as the request, allocate it
 	} else {
-
+		// If block is approximately the same size as the request, allocate it
+	
+		// Make sure top and bottom tags hold same information
 		tag_ptr->tag=1;
 		end_ptr = tag_ptr + (tag_ptr->size / 16) + 1;
 		end_ptr->size = tag_ptr->size;
 		end_ptr->tag = 1;
 
+		// Place in free list
 		struct free_block *prev = ptr->back_link;
 		prev->fwd_link = ptr->fwd_link;
 		ptr->fwd_link->back_link = prev;
 
+		// Assign signatures
 		strcpy(tag_ptr->sig, "top_alcblk");
 		strcpy(end_ptr->sig, "end_alcblk");
 	}
@@ -448,7 +457,7 @@ int free_size() {
 
 unsigned int release_mem( void *ptr ){
 
-	// Check for bad pointer
+	// Check for failure conditions
 	if(ptr == NULL) return 1;
 
 	int coalesce_lower = 0, coalesce_upper = 0;
@@ -462,7 +471,7 @@ unsigned int release_mem( void *ptr ){
 
 	// Check upper and lower blocks
 	coalesce_lower = (end_ptr + 1)->tag == 0 ? 1 : 0;
-	coalesce_upper = (tag_ptr - 1)->tag == 0 ? 1 :  0;
+	coalesce_upper = (tag_ptr - 1)->tag == 0 ? 1 : 0;
 
 	// Case 1: No coalesce
 	if(!coalesce_lower && !coalesce_upper) {
@@ -477,6 +486,7 @@ unsigned int release_mem( void *ptr ){
 		f_ptr->fwd_link = temp_ptr;
 		f_ptr->fwd_link->back_link = f_ptr;
 
+		// Assign signatures
 		strcpy(tag_ptr->sig, "top_memblk");
 		strcpy(end_ptr->sig, "end_memblk");
 
@@ -484,15 +494,21 @@ unsigned int release_mem( void *ptr ){
 	// Case 2: Coalesce with upper
 	else if(!coalesce_lower && coalesce_upper) {
 	
+		// Locate tag blocks
 		struct tag_block *upper_lower_tag = tag_ptr - 1;
 		struct tag_block *top_tag = upper_lower_tag - (upper_lower_tag->size / 16) - 1;
 
+		// Reset tag block status
 		top_tag->tag = 0;
 		end_ptr->tag = 0;
 
+		// Upper block is already in the free list
+
+		// Adjust size to reflect merge
 		top_tag->size += tag_ptr->size + 2 * sizeof(struct tag_block);
 		end_ptr->size = top_tag->size;
 
+		// Assign signatures
 		strcpy(top_tag->sig, "top_memblk");
 		strcpy(end_ptr->sig, "end_memblk");
 
@@ -500,27 +516,34 @@ unsigned int release_mem( void *ptr ){
 	// Case 3: Coalesce with lower
 	else if(coalesce_lower && !coalesce_upper) {
 
+		// Locate tag blocks
 		struct tag_block *lower_upper_tag = end_ptr + 1;
 		struct tag_block *bottom_tag = lower_upper_tag + (lower_upper_tag->size / 16) + 1;
 		struct free_block *bottom_block = (struct free_block *)(lower_upper_tag + 1);
 
+		// Reset tag block status
 		bottom_tag->tag = 0;
 		tag_ptr->tag = 0;
 
+		// Adjust size to reflect merge
 		tag_ptr->size += bottom_tag->size + 2 * sizeof(struct tag_block);
 		bottom_tag->size = tag_ptr->size;
 
+		// Insert upper block at the previous location of the lower
+		// block in the free list
 		f_ptr->fwd_link = bottom_block->fwd_link;
 		f_ptr->fwd_link->back_link = f_ptr;
 		f_ptr->back_link = bottom_block->back_link;
 		f_ptr->back_link->fwd_link = f_ptr;
 
+		// Assign signatures
 		strcpy(tag_ptr->sig, "top_memblk");
 		strcpy(bottom_tag->sig, "end_memblk");
 
 	}
 	// Case 4: Coalesce with upper and lower
 	else {
+		// Locate tag blocks
 		struct tag_block *upper_lower_tag = tag_ptr - 1;
 		struct tag_block *top_tag = upper_lower_tag - (upper_lower_tag->size / 16) - 1;
 		struct free_block *top_block = (struct free_block *)(top_tag + 1);
@@ -529,17 +552,24 @@ unsigned int release_mem( void *ptr ){
 		struct tag_block *bottom_tag = lower_upper_tag + (lower_upper_tag->size / 16) + 1;
 		struct free_block *bottom_block = (struct free_block *)(lower_upper_tag + 1);
 
+		// Reset tag block status
+		top_tag->tag = 0;
+		bottom_tag->tag = 0;
+
+		// Adjust size to reflect merge
 		top_tag->size += bottom_tag->size + tag_ptr->size +  4 * sizeof(struct tag_block);
 		bottom_tag->size = top_tag->size;
 
+		// Update top block to remove bottom block from free list
 		top_block->fwd_link = bottom_block->fwd_link;
 		top_block->fwd_link->back_link = top_block;
 
+		// Assign signatures
 		strcpy(top_tag->sig, "top_memblk");
 		strcpy(bottom_tag->sig, "end_memblk");
 
 	}
-	// Return status integer
+	// Return status integer to signal successful completion
 	return 0;
 }
 
