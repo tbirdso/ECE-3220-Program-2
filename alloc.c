@@ -480,24 +480,26 @@ unsigned int release_mem( void *ptr ){
 
 		top_tag->size += tag_ptr->size + 2 * sizeof(struct tag_block);
 		end_ptr->size = top_tag->size;
+
 	}
 	// Case 3: Coalesce with lower
 	else if(coalesce_lower && !coalesce_upper) {
 
-		struct tag_block *lower_upper_tag = tag_ptr - 1;
-		struct tag_block *bottom_tag = lower_upper_tag - (lower_upper_tag->size / 16) - 1;
-		struct free_block *bottom_block = (struct free_block *)(bottom_tag + 1);
+		struct tag_block *lower_upper_tag = end_ptr + 1;
+		struct tag_block *bottom_tag = lower_upper_tag + (lower_upper_tag->size / 16) + 1;
+		struct free_block *bottom_block = (struct free_block *)(lower_upper_tag + 1);
 
 		bottom_tag->tag = 0;
 		tag_ptr->tag = 0;
 
-		bottom_tag->size += tag_ptr->size + 2 * sizeof(struct tag_block);
-		tag_ptr->size = bottom_tag->size;
+		tag_ptr->size += bottom_tag->size + 2 * sizeof(struct tag_block);
+		bottom_tag->size = tag_ptr->size;
 
 		f_ptr->fwd_link = bottom_block->fwd_link;
 		f_ptr->fwd_link->back_link = f_ptr;
 		f_ptr->back_link = bottom_block->back_link;
 		f_ptr->back_link->fwd_link = f_ptr;
+
 	}
 	// Case 4: Coalesce with upper and lower
 	else {
@@ -505,11 +507,11 @@ unsigned int release_mem( void *ptr ){
 		struct tag_block *top_tag = upper_lower_tag - (upper_lower_tag->size / 16) - 1;
 		struct free_block *top_block = (struct free_block *)(top_tag + 1);
 
-		struct tag_block *lower_upper_tag = tag_ptr - 1;
-		struct tag_block *bottom_tag = lower_upper_tag - (lower_upper_tag->size / 16) - 1;
-		struct free_block *bottom_block = (struct free_block *)(bottom_tag + 1);
+		struct tag_block *lower_upper_tag = end_ptr + 1;
+		struct tag_block *bottom_tag = lower_upper_tag + (lower_upper_tag->size / 16) + 1;
+		struct free_block *bottom_block = (struct free_block *)(lower_upper_tag + 1);
 
-		top_tag->size += bottom_tag->size + 4 * sizeof(struct tag_block);
+		top_tag->size += bottom_tag->size + tag_ptr->size +  4 * sizeof(struct tag_block);
 		bottom_tag->size = top_tag->size;
 
 		top_block->fwd_link = bottom_block->fwd_link;
